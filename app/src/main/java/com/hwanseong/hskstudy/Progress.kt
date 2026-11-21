@@ -47,7 +47,14 @@ class ProgressStore(context: Context) {
         status[id] = s
         prefs.edit().putInt("s_$id", s.code).apply()
         markStudiedToday()
+        val key = "d_${LocalDate.now()}"
+        daily.edit().putInt(key, daily.getInt(key, 0) + 1).apply()
     }
+
+    /** 날짜별 답한 횟수 (통계용). 키 "d_2026-11-21" */
+    private val daily = context.getSharedPreferences("daily", Context.MODE_PRIVATE)
+
+    fun answeredOn(date: LocalDate): Int = daily.getInt("d_$date", 0)
 
     fun isFavorite(id: Int): Boolean = favorites[id] == true
 

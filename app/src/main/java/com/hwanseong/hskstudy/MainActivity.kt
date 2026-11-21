@@ -145,7 +145,7 @@ fun App(data: VocabData, progress: ProgressStore, requestedTab: MutableState<Tab
                         Tab.WORDS -> WordsScreen(data, progress)
                         Tab.GAME -> GameSetupScreen(data) { s -> gameKey += 1; game = s }
                         Tab.LISTEN -> ListenScreen(data)
-                        Tab.STATS -> ComingSoon("통계", "통계 화면은 3단계에서 만들어요.")
+                        Tab.STATS -> StatsScreen(data, progress)
                     }
                     if (tab != Tab.HOME) BackHandler { tab = Tab.HOME }
                 }
