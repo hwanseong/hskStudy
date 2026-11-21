@@ -72,7 +72,7 @@ data class GameSettings(
 
 /** 오답 노트 개수 (게임 화면에서 채운다). 키: "w_<단어 id>" 또는 "s_<예문 id>" */
 fun wrongNoteCount(context: Context, mode: String): Int =
-    context.getSharedPreferences("wrong", Context.MODE_PRIVATE).all.keys.count { it.startsWith(if (mode == "word") "w_" else "s_") }
+    WrongNote.keys(context).count { it.startsWith(if (mode == "word") "w_" else "s_") }
 
 private val ShuffleIcon = Icons.line(
     "shuffle",
@@ -83,7 +83,7 @@ private val NoteIcon = Icons.line("note", "M6 3h9l4 4v14H6z", "M9 12h7M9 16h5")
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun GameSetupScreen(data: VocabData) {
+fun GameSetupScreen(data: VocabData, onStart: (GameSettings) -> Unit) {
     val context = LocalContext.current
     var s by remember { mutableStateOf(GameSettings.load(context)) }
     fun update(n: GameSettings) { s = n; n.save(context) }
@@ -167,9 +167,7 @@ fun GameSetupScreen(data: VocabData) {
         }
 
         Box(Modifier.padding(bottom = 20.dp)) {
-            Box56Button("게임 시작") {
-                Toast.makeText(context, "설정을 저장했어요. 퀴즈 화면은 다음 작업에서 연결돼요.", Toast.LENGTH_LONG).show()
-            }
+            Box56Button("게임 시작") { onStart(s.copy(wrongOnly = s.wrongOnly && wrong > 0)) }
         }
     }
 }

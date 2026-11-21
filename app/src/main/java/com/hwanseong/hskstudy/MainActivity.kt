@@ -37,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -100,9 +101,14 @@ class MainActivity : ComponentActivity() {
 fun App(data: VocabData, progress: ProgressStore, requestedTab: MutableState<Tab?>) {
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
     var studying by rememberSaveable { mutableStateOf(false) }
+    var studyQueue by remember { mutableStateOf<List<Int>?>(null) }   // 오답 복습처럼 정해진 단어로 학습할 때
+    var game by remember { mutableStateOf<GameSettings?>(null) }      // 진행 중인 게임
+    var gameKey by remember { mutableIntStateOf(0) }                  // 다시 하기 때 새 게임으로
+    var result by remember { mutableStateOf<GameResult?>(null) }
     LaunchedEffect(requestedTab.value) {
         requestedTab.value?.let { tab = it; studying = false; requestedTab.value = null }
     }
+    val fullScreen = studying || game != null || result != null
 
     Column(
         Modifier
@@ -111,21 +117,41 @@ fun App(data: VocabData, progress: ProgressStore, requestedTab: MutableState<Tab
             .statusBarsPadding(),
     ) {
         Box(Modifier.weight(1f)) {
-            if (studying) {
-                BackHandler { studying = false }
-                StudyScreen(data, progress) { studying = false }
-            } else {
-                when (tab) {
-                    Tab.HOME -> HomeScreen(data, progress, onStartStudy = { studying = true }, onOpenTab = { tab = it })
-                    Tab.WORDS -> WordsScreen(data, progress)
-                    Tab.GAME -> GameSetupScreen(data)
-                    Tab.LISTEN -> ListenScreen(data)
-                    Tab.STATS -> ComingSoon("통계", "통계 화면은 3단계에서 만들어요.")
+            when {
+                studying -> {
+                    val close = { studying = false; studyQueue = null }
+                    BackHandler(onBack = close)
+                    StudyScreen(data, progress, studyQueue, close)
                 }
-                if (tab != Tab.HOME) BackHandler { tab = Tab.HOME }
+                game != null -> {
+                    BackHandler { game = null }
+                    key(gameKey) {
+                        GameScreen(data, game!!, onExit = { game = null }) { r -> result = r; game = null }
+                    }
+                }
+                result != null -> {
+                    val r = result!!
+                    BackHandler { result = null }
+                    ResultScreen(
+                        r,
+                        onReview = { ids -> result = null; studyQueue = ids; studying = true },
+                        onAgain = { result = null; gameKey += 1; game = r.settings },
+                        onClose = { result = null },
+                    )
+                }
+                else -> {
+                    when (tab) {
+                        Tab.HOME -> HomeScreen(data, progress, onStartStudy = { studyQueue = null; studying = true }, onOpenTab = { tab = it })
+                        Tab.WORDS -> WordsScreen(data, progress)
+                        Tab.GAME -> GameSetupScreen(data) { s -> gameKey += 1; game = s }
+                        Tab.LISTEN -> ListenScreen(data)
+                        Tab.STATS -> ComingSoon("통계", "통계 화면은 3단계에서 만들어요.")
+                    }
+                    if (tab != Tab.HOME) BackHandler { tab = Tab.HOME }
+                }
             }
         }
-        if (!studying) BottomBar(tab) { tab = it }
+        if (!fullScreen) BottomBar(tab) { tab = it }
     }
 }
 

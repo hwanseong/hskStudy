@@ -49,11 +49,11 @@ fun todayQueue(data: VocabData, progress: ProgressStore): List<Int> {
 }
 
 @Composable
-fun StudyScreen(data: VocabData, progress: ProgressStore, onClose: () -> Unit) {
+fun StudyScreen(data: VocabData, progress: ProgressStore, customQueue: List<Int>? = null, onClose: () -> Unit) {
     val context = LocalContext.current
     val byId = remember(data) { data.words.associateBy { it.id } }
     // 세션 동안 고정되는 학습 순서. "모름"으로 답한 단어는 끝에 한 번 더 붙는다.
-    val queue = remember { mutableStateListOf<Int>().apply { addAll(todayQueue(data, progress)) } }
+    val queue = remember { mutableStateListOf<Int>().apply { addAll(customQueue ?: todayQueue(data, progress)) } }
     var pos by remember { mutableIntStateOf(0) }
     var flipped by remember { mutableStateOf(false) }
     val answered = remember { mutableStateListOf<Pair<Int, WordStatus>>() }

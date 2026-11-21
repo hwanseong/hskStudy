@@ -28,6 +28,8 @@ data class Sentence(
     val pinyin: String,
     val ko: String,
     val audio: String,
+    /** 예문 안 단어 위치 [시작, 끝). 이합사처럼 떨어져 있으면 null */
+    val blank: IntRange?,
 )
 
 val POS_KO = mapOf(
@@ -63,6 +65,7 @@ class VocabData(context: Context) {
             Sentence(
                 o.getString("id"), o.getInt("wordId"), o.getString("zh"), o.getString("pinyin"),
                 o.getString("ko"), o.getString("audio"),
+                if (o.isNull("blank")) null else o.getJSONArray("blank").let { b -> b.getInt(0) until b.getInt(1) },
             )
         }
         sentencesByWord = sentences.groupBy { it.wordId }
