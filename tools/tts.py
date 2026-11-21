@@ -139,13 +139,35 @@ def pinyin_to_numbered(py: str) -> str | None:
 
 
 def word_input(w: dict) -> dict:
+    """한 글자 단어만 병음을 지정한다. 여러 글자 단어에 병음을 지정하면 무음이 나오는 경우가 있었고,
+    여러 글자 단어는 글자 그대로 읽혀도 대강 병음대로 읽힌다(觉得·还是·长大 등 시험 확인)."""
     hz, py = w["hanzi"], w["pinyin"]
-    needs = len(hz) == 1 or any(c in POLYPHONIC for c in hz)
-    if needs and "儿" not in hz:
+    if len(hz) == 1:
         num = pinyin_to_numbered(py)
         if num and len(num.split()) == len(hz):
             return {"ssml": f'<speak><phoneme alphabet="pinyin" ph="{num}">{hz}</phoneme></speak>'}
     return {"text": hz}
+
+
+def loudness(path: Path):
+    """(길이 초, 최대 음량 dB). ffmpeg가 없으면 (None, None)."""
+    import shutil
+    import subprocess
+    if not shutil.which("ffmpeg"):
+        return None, None
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-i", str(path), "-af", "volumedetect", "-f", "null", "-"],
+                       capture_output=True, text=True).stderr
+    mx = re.search(r"max_volume: ([-\d.]+) dB", r)
+    dur = re.findall(r"time=(\d+):(\d+):([\d.]+)", r)
+    secs = int(dur[-1][1]) * 60 + float(dur[-1][2]) if dur else 0.0
+    return secs, float(mx.group(1)) if mx else -99.0
+
+
+def is_silent(path: Path) -> bool:
+    secs, mx = loudness(path)
+    if secs is None:
+        return False
+    return mx < -30 or secs < 0.35
 
 
 def synth_retry(voice, lang, inp, tries=8):
@@ -174,25 +196,35 @@ def generate_all():
         jobs.append((assets / w["audioKo"], VOICE_KO, {"text": w["meaningTts"]}))
     for s in sents:
         jobs.append((assets / s["audio"], VOICE_ZH, {"text": s["zh"]}))
-    todo = [j for j in jobs if not j[0].exists() or j[0].stat().st_size == 0]
-    print(f"전체 {len(jobs)}개 중 생성할 파일 {len(todo)}개")
+    existing = [j for j in jobs if j[0].exists() and j[0].stat().st_size > 0]
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        silent_flags = list(ex.map(lambda j: is_silent(j[0]), existing))
+    silent = {str(j[0]) for j, bad in zip(existing, silent_flags) if bad}
+    todo = [j for j in jobs if not j[0].exists() or j[0].stat().st_size == 0 or str(j[0]) in silent]
+    print(f"전체 {len(jobs)}개 중 무음 {len(silent)}개, 다시/새로 만들 파일 {len(todo)}개")
     failures = []
 
     def run(job):
         path, (lang, voice), inp = job
         try:
-            audio = synth_retry(voice, lang, inp)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(audio)
+            for attempt in range(4):  # 가끔 무음이 오므로 음량을 재서 다시 만든다
+                if attempt == 3 and "ssml" in inp:
+                    inp = {"text": re.sub(r"<[^>]+>", "", inp["ssml"])}
+                audio = synth_retry(voice, lang, inp)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(audio)
+                if not is_silent(path):
+                    return
+            failures.append(f"{path.name}: 4번 만들어도 무음")
         except Exception as e:  # noqa: BLE001
             failures.append(f"{path.name}: {e}")
 
     with ThreadPoolExecutor(max_workers=3) as ex:
         list(ex.map(run, todo))
-    small = [str(p.relative_to(assets)) for p, _, _ in jobs if p.exists() and p.stat().st_size < 800]
+    small = [str(p.relative_to(assets)) for p, _, _ in todo if p.exists() and is_silent(p)]
     missing = sum(1 for p, _, _ in jobs if not p.exists())
-    phon = sum(1 for w in words if "ssml" in word_input(w))
-    print(f"병음 지정 단어 {phon}개, 이번 실패 {len(failures)}개, 남은 빈 파일 {missing}개, 800B 미만 의심 파일 {len(small)}개")
+    phon = sum(1 for w in words if "ssml" in word_input(w))  # 한 글자 단어
+    print(f"병음 지정 단어 {phon}개, 이번 실패 {len(failures)}개, 남은 빈 파일 {missing}개, 다시 만든 뒤에도 무음 {len(small)}개")
     for f in [x.splitlines()[0] for x in failures[:10]] + small[:20]:
         print(" -", f)
     if missing:
