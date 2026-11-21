@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 임시 아이콘: 주홍색 바탕 위 흰 카드 두 장. 앱 이름·아이콘 확정 후 교체 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#F8E7E4"
+        android:pathData="M38,34h30a4,4 0 0 1 4,4v34a4,4 0 0 1 -4,4h-30a4,4 0 0 1 -4,-4v-34a4,4 0 0 1 4,-4z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M42,30h30a4,4 0 0 1 4,4v34a4,4 0 0 1 -4,4h-30a4,4 0 0 1 -4,-4v-34a4,4 0 0 1 4,-4z" />
+    <path
+        android:fillColor="#B8322A"
+        android:pathData="M48,44h18v4h-18zM56,40h4v24h-4zM48,56h18v4h-18z" />
+</vector>

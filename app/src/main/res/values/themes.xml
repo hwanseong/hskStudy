@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.HskStudy" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/ground</item>
+        <item name="android:statusBarColor">@color/ground</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+    <color name="ground">#F6F4F0</color>
+    <color name="accent">#B8322A</color>
+</resources>
