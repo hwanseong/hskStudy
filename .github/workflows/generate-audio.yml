@@ -8,7 +8,7 @@ on:
         required: true
         default: sample
         type: choice
-        options: [sample, all]
+        options: [sample, all, probe]
 
 permissions:
   contents: write
@@ -42,6 +42,12 @@ jobs:
             dist/samples/*.mp3
             dist/samples/README.txt
           body: "갤럭시에서 mp3를 눌러 들어 보고, 마음에 드는 중국어·한국어 음성 이름을 알려 주세요. 파일 이름: 언어_음성_항목.mp3"
+
+      - name: Probe
+        if: inputs.mode == 'probe'
+        env:
+          GOOGLE_TTS_API_KEY: ${{ secrets.GOOGLE_TTS_API_KEY }}
+        run: python3 tools/tts.py probe
 
       - name: Generate all audio
         if: inputs.mode == 'all'

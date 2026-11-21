@@ -199,7 +199,39 @@ def generate_all():
         print(f"::warning::음성 {missing}개가 아직 없습니다. generate-audio all을 다시 실행하면 빈 파일만 채웁니다.")
 
 
+
+def probe():
+    """짧은 입력·병음 지정 방식별로 실제 소리가 나는지 시험한다 (ffmpeg로 길이·최대 음량 측정)."""
+    import subprocess
+    tests = [
+        ("ko", {"text": "물"}), ("ko", {"text": "물."}), ("ko", {"text": "물!"}),
+        ("ko", {"ssml": "<speak><s>물</s></speak>"}), ("ko", {"text": "물, 물"}),
+        ("ko", {"text": "우리."}), ("ko", {"text": "차, 마시는 차"}), ("ko", {"text": "왜?"}),
+        ("zh", {"text": "觉得"}), ("zh", {"text": "还是"}), ("zh", {"text": "长大"}),
+        ("zh", {"ssml": '<speak><phoneme alphabet="pinyin" ph="jue2">觉</phoneme><phoneme alphabet="pinyin" ph="de5">得</phoneme></speak>'}),
+        ("zh", {"ssml": '<speak><phoneme alphabet="pinyin" ph="jue2de5">觉得</phoneme></speak>'}),
+        ("zh", {"ssml": '<speak><phoneme alphabet="pinyin" ph="jue2 de0">觉得</phoneme></speak>'}),
+        ("zh", {"text": "水"}), ("zh", {"text": "水。"}),
+    ]
+    out = ROOT / "dist" / "probe"
+    out.mkdir(parents=True, exist_ok=True)
+    for n, (lang, inp) in enumerate(tests):
+        lang_code, voice = VOICE_KO if lang == "ko" else VOICE_ZH
+        try:
+            audio = synth(voice, lang_code, encoding="OGG_OPUS", **inp)
+        except RuntimeError as e:
+            print(f"{n:2d} {inp} → 오류 {str(e)[:120]}")
+            continue
+        f = out / f"p{n}.ogg"
+        f.write_bytes(audio)
+        r = subprocess.run(["ffmpeg", "-hide_banner", "-i", str(f), "-af", "volumedetect", "-f", "null", "-"],
+                           capture_output=True, text=True).stderr
+        mx = re.search(r"max_volume: ([-\d.]+) dB", r)
+        dur = re.findall(r"time=\d+:\d+:([\d.]+)", r)
+        print(f"{n:2d} {inp} → {dur[-1] if dur else '?'}초, 최대 {mx.group(1) if mx else '?'} dB")
+
+
 if __name__ == "__main__":
     if not KEY:
         sys.exit("GOOGLE_TTS_API_KEY가 없습니다.")
-    {"sample": sample, "all": generate_all}[sys.argv[1] if len(sys.argv) > 1 else "sample"]()
+    {"sample": sample, "all": generate_all, "probe": probe}[sys.argv[1] if len(sys.argv) > 1 else "sample"]()
