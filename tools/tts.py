@@ -148,7 +148,7 @@ def word_input(w: dict) -> dict:
     return {"text": hz}
 
 
-def synth_retry(voice, lang, inp, tries=5):
+def synth_retry(voice, lang, inp, tries=8):
     for k in range(tries):
         try:
             return synth(voice, lang, encoding="OGG_OPUS", **inp)
@@ -159,7 +159,8 @@ def synth_retry(voice, lang, inp, tries=5):
             if "ssml" in inp and msg.startswith("400"):
                 inp = {"text": re.sub(r"<[^>]+>", "", inp["ssml"])}  # 병음 지정이 거부되면 글자 그대로 읽힌다
                 continue
-            time.sleep(2 ** k)
+            # 429(분당 한도)는 길게 쉬었다가 다시 시도한다
+            time.sleep(min(60, 5 * 2 ** k) if msg.startswith("429") else 2 ** k)
 
 
 def generate_all():
@@ -186,15 +187,16 @@ def generate_all():
         except Exception as e:  # noqa: BLE001
             failures.append(f"{path.name}: {e}")
 
-    with ThreadPoolExecutor(max_workers=6) as ex:
+    with ThreadPoolExecutor(max_workers=3) as ex:
         list(ex.map(run, todo))
-    small = [str(p.relative_to(assets)) for p, _, _ in jobs if p.exists() and p.stat().st_size < 2000]
+    small = [str(p.relative_to(assets)) for p, _, _ in jobs if p.exists() and p.stat().st_size < 800]
+    missing = sum(1 for p, _, _ in jobs if not p.exists())
     phon = sum(1 for w in words if "ssml" in word_input(w))
-    print(f"병음 지정 단어 {phon}개, 실패 {len(failures)}개, 2KB 미만 의심 파일 {len(small)}개")
-    for f in failures[:30] + small[:30]:
+    print(f"병음 지정 단어 {phon}개, 이번 실패 {len(failures)}개, 남은 빈 파일 {missing}개, 800B 미만 의심 파일 {len(small)}개")
+    for f in [x.splitlines()[0] for x in failures[:10]] + small[:20]:
         print(" -", f)
-    if failures:
-        sys.exit(1)
+    if missing:
+        print(f"::warning::음성 {missing}개가 아직 없습니다. generate-audio all을 다시 실행하면 빈 파일만 채웁니다.")
 
 
 if __name__ == "__main__":
