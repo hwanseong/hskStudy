@@ -108,7 +108,7 @@ fun HomeScreen(
                     ProgressBar(known.toFloat() / total.coerceAtLeast(1))
                 }
             }
-            Text("단어 목록에서 \"앎\"으로 표시한 단어가 진도에 들어가요", fontSize = 12.sp, color = Secondary)
+            Text("학습 카드나 단어 목록에서 \"앎\"으로 답한 단어가 진도에 들어가요", fontSize = 12.sp, color = Secondary)
         }
 
         Text(

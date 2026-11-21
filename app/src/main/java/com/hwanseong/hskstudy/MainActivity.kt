@@ -85,7 +85,7 @@ fun App(data: VocabData, progress: ProgressStore) {
         Box(Modifier.weight(1f)) {
             if (studying) {
                 BackHandler { studying = false }
-                StudyPreviewScreen(data) { studying = false }
+                StudyScreen(data, progress) { studying = false }
             } else {
                 when (tab) {
                     Tab.HOME -> HomeScreen(data, progress, onStartStudy = { studying = true }, onOpenTab = { tab = it })
@@ -142,82 +142,5 @@ private fun ComingSoon(title: String, message: String) {
         Text(title, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Ink)
         Text("준비 중", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Accent, modifier = Modifier.padding(top = 24.dp))
         Text(message, fontSize = 14.sp, color = Secondary)
-    }
-}
-
-/** 학습 카드 화면이 나오기 전까지 쓰는 미리보기. 1번 단어부터 넘겨 본다. */
-@Composable
-private fun StudyPreviewScreen(data: VocabData, onClose: () -> Unit) {
-    val context = LocalContext.current
-    val words = data.words
-    var index by remember { mutableIntStateOf(0) }
-    val word = words[index]
-    Column(
-        Modifier
-            .fillMaxSize()
-            .navigationBarsPadding()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(44.dp).clip(RoundedCornerShape(22.dp)).clickable(onClick = onClose), contentAlignment = Alignment.Center) {
-                Icon(Icons.Close, "닫기", tint = Ink)
-            }
-            Text("학습 카드 미리보기 · ${index + 1} / ${words.size}", fontSize = 13.sp, color = Secondary)
-        }
-        Text("학습 카드 화면은 다음 작업에서 완성돼요.", fontSize = 12.sp, color = Secondary)
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .clip(RoundedCornerShape(20.dp))
-                .background(Surface)
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text("${word.level}급 · ${word.id}번", fontSize = 12.sp, color = Accent)
-            Text(word.hanzi, fontSize = 72.sp, color = Ink, modifier = Modifier.clickable { AudioPlayer.play(context, word.audioZh) })
-            Text(word.pinyin, fontSize = 20.sp, color = Accent)
-            Text(
-                word.meaning, fontSize = 18.sp, fontWeight = FontWeight.Medium, color = Ink,
-                modifier = Modifier.clickable { AudioPlayer.play(context, word.audioKo) },
-            )
-            data.examplesOf(word.id).forEachIndexed { n, s ->
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Ground)
-                        .clickable { AudioPlayer.play(context, s.audio) }
-                        .padding(12.dp),
-                ) {
-                    Text("예문 ${n + 1}", fontSize = 11.sp, color = Secondary)
-                    Text(s.zh, fontSize = 18.sp, color = Ink)
-                    Text(s.pinyin, fontSize = 13.sp, color = Secondary)
-                    Text(s.ko, fontSize = 14.sp, color = Ink)
-                }
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            listOf("이전" to -1, "다음" to 1).forEach { (label, step) ->
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .height(52.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(if (step > 0) Accent else Surface)
-                        .clickable {
-                            index = (index + step + words.size) % words.size
-                            AudioPlayer.play(context, words[index].audioZh)
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(label, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = if (step > 0) Surface else Ink)
-                }
-            }
-        }
     }
 }

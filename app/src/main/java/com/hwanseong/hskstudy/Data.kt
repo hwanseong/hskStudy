@@ -12,7 +12,11 @@ data class Word(
     val meaning: String,
     val audioZh: String,
     val audioKo: String,
+    val pos: List<String>,
 ) {
+    /** 품사 한국어 표기 (예: ["noun","verb"] → "명사·동사") */
+    val posKo: String = pos.mapNotNull { POS_KO[it] }.joinToString("·")
+
     /** 검색용: 성조·공백·기호를 뺀 병음 (예: "bāozi" → "baozi") */
     val pinyinPlain: String = plainPinyin(pinyin)
 }
@@ -24,6 +28,12 @@ data class Sentence(
     val pinyin: String,
     val ko: String,
     val audio: String,
+)
+
+val POS_KO = mapOf(
+    "noun" to "명사", "verb" to "동사", "adj" to "형용사", "adv" to "부사", "pron" to "대명사",
+    "num" to "수사", "measure" to "양사", "num-measure" to "수량사", "prep" to "개사", "conj" to "접속사",
+    "particle" to "조사", "interj" to "감탄사", "prefix" to "접두사", "suffix" to "접미사", "phrase" to "구",
 )
 
 fun plainPinyin(s: String): String =
@@ -44,6 +54,7 @@ class VocabData(context: Context) {
             Word(
                 o.getInt("id"), o.getInt("level"), o.getString("hanzi"), o.getString("pinyin"),
                 o.getString("meaningKo"), o.getString("audioZh"), o.getString("audioKo"),
+                o.getJSONArray("pos").let { a -> List(a.length()) { j -> a.getString(j) } },
             )
         }
         val s = JSONArray(context.assets.open("data/sentences.json").bufferedReader().use { it.readText() })
