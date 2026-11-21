@@ -1,0 +1,43 @@
+name: generate-audio
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "sample = 여성 음성 후보 샘플(mp3)을 voice-samples 릴리스에 올림"
+        required: true
+        default: sample
+        type: choice
+        options: [sample]
+
+permissions:
+  contents: write
+
+jobs:
+  tts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate samples
+        if: inputs.mode == 'sample'
+        env:
+          GOOGLE_TTS_API_KEY: ${{ secrets.GOOGLE_TTS_API_KEY }}
+        run: python3 tools/tts.py sample
+
+      - name: Publish samples
+        if: inputs.mode == 'sample'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: voice-samples
+          name: 음성 샘플 (여성 후보)
+          prerelease: true
+          make_latest: false
+          files: |
+            dist/samples/*.mp3
+            dist/samples/README.txt
+          body: "갤럭시에서 mp3를 눌러 들어 보고, 마음에 드는 중국어·한국어 음성 이름을 알려 주세요. 파일 이름: 언어_음성_항목.mp3"
