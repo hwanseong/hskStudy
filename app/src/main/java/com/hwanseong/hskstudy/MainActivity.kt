@@ -1,6 +1,10 @@
 package com.hwanseong.hskstudy
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.AudioManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -30,6 +34,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -55,26 +61,48 @@ enum class Tab(val label: String, val icon: ImageVector) {
 }
 
 class MainActivity : ComponentActivity() {
+    /** 알림을 눌러 들어왔을 때 열 탭 (예: 듣기 모드 알림 → 듣기 탭) */
+    private val requestedTab = mutableStateOf<Tab?>(null)
+
+    private fun readTab(intent: Intent?) {
+        intent?.getStringExtra("tab")?.let { name -> requestedTab.value = Tab.entries.firstOrNull { it.name == name } }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        readTab(intent)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // 앱 바탕이 밝은색이라 기기가 다크 모드여도 상태바·내비게이션 아이콘은 어둡게 둔다
         val light = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
         enableEdgeToEdge(statusBarStyle = light, navigationBarStyle = light)
         super.onCreate(savedInstanceState)
         volumeControlStream = AudioManager.STREAM_MUSIC  // 음량 버튼이 미디어 음량을 조절하도록
+        readTab(intent)
+        // 듣기 모드 알림(잠금 화면 조작)을 보여 주려면 Android 13부터 알림 권한이 필요하다
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+        }
         val data = VocabData(this)
         val progress = ProgressStore(this)
         setContent {
             MaterialTheme {
-                App(data, progress)
+                App(data, progress, requestedTab)
             }
         }
     }
 }
 
 @Composable
-fun App(data: VocabData, progress: ProgressStore) {
+fun App(data: VocabData, progress: ProgressStore, requestedTab: MutableState<Tab?>) {
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
     var studying by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(requestedTab.value) {
+        requestedTab.value?.let { tab = it; studying = false; requestedTab.value = null }
+    }
 
     Column(
         Modifier
@@ -90,8 +118,8 @@ fun App(data: VocabData, progress: ProgressStore) {
                 when (tab) {
                     Tab.HOME -> HomeScreen(data, progress, onStartStudy = { studying = true }, onOpenTab = { tab = it })
                     Tab.WORDS -> WordsScreen(data, progress)
-                    Tab.GAME -> ComingSoon("게임 학습", "단어·예문 퀴즈는 2단계에서 만들어요.")
-                    Tab.LISTEN -> ComingSoon("듣기 모드", "연속 재생 듣기 모드는 2단계에서 만들어요.")
+                    Tab.GAME -> GameSetupScreen(data)
+                    Tab.LISTEN -> ListenScreen(data)
                     Tab.STATS -> ComingSoon("통계", "통계 화면은 3단계에서 만들어요.")
                 }
                 if (tab != Tab.HOME) BackHandler { tab = Tab.HOME }

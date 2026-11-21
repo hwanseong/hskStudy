@@ -67,6 +67,7 @@ private fun lineIcon(name: String, vararg paths: String): ImageVector =
     }.build()
 
 object Icons {
+    fun line(name: String, vararg paths: String): ImageVector = lineIcon(name, *paths)
     val Home = lineIcon("home", "M3 10l9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z")
     val Book = lineIcon("book", "M4 19V5a2 2 0 0 1 2-2h14v14H6a2 2 0 0 0-2 2zm0 0a2 2 0 0 0 2 2h14")
     val Game = lineIcon(
