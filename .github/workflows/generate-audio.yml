@@ -24,6 +24,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install ffmpeg (음량 점검용)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+
       - name: Generate samples
         if: inputs.mode == 'sample'
         env:
