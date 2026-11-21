@@ -1,8 +1,11 @@
 package com.hwanseong.hskstudy
 
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -46,24 +49,34 @@ data class Word(
 )
 data class Sentence(val id: String, val wordId: Int, val zh: String, val pinyin: String, val ko: String, val audio: String)
 
-/** assets의 음성 파일을 재생한다. 새로 재생하면 이전 재생은 멈춘다. 파일이 없으면 조용히 넘어간다. */
+/** assets의 음성 파일을 미디어 음량으로 재생한다. 새로 재생하면 이전 재생은 멈춘다. 실패하면 이유를 화면에 띄운다. */
 object AudioPlayer {
     private var player: MediaPlayer? = null
 
     fun play(context: Context, path: String) {
         player?.release()
         player = null
-        val fd = try {
-            context.assets.openFd(path)
-        } catch (e: Exception) {
-            return
+        val am = context.getSystemService(AudioManager::class.java)
+        if (am.getStreamVolume(AudioManager.STREAM_MUSIC) == 0) {
+            Toast.makeText(context, "미디어 음량이 0이에요. 음량 버튼으로 올려 주세요.", Toast.LENGTH_SHORT).show()
         }
-        player = MediaPlayer().apply {
-            setDataSource(fd.fileDescriptor, fd.startOffset, fd.length)
-            fd.close()
-            setOnCompletionListener { it.release(); if (player === it) player = null }
-            prepare()
-            start()
+        try {
+            val fd = context.assets.openFd(path)
+            player = MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                setDataSource(fd.fileDescriptor, fd.startOffset, fd.length)
+                fd.close()
+                setOnCompletionListener { it.release(); if (player === it) player = null }
+                prepare()
+                start()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(context, "재생 실패: $path (${e.javaClass.simpleName}: ${e.message})", Toast.LENGTH_LONG).show()
         }
     }
 }
@@ -93,6 +106,7 @@ fun loadSentences(context: Context): List<Sentence> {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        volumeControlStream = AudioManager.STREAM_MUSIC  // 음량 버튼이 미디어 음량을 조절하도록
         val words = loadWords(this)
         val sentences = loadSentences(this)
         setContent {
@@ -120,6 +134,7 @@ fun CheckScreen(words: List<Word>, sentences: List<Sentence>) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("HSK 단어장", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Ink)
+        Text("버전 ${BuildConfig.VERSION_NAME}", fontSize = 12.sp, color = Secondary)
         Text(
             "데이터 확인: 단어 ${words.size}개 (1급 ${counts[1]} · 2급 ${counts[2]} · 3급 ${counts[3]}), 예문 ${sentences.size}개",
             fontSize = 14.sp,

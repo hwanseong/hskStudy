@@ -49,6 +49,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     androidResources {
         // 음성 파일(ogg)은 이미 압축돼 있으므로 다시 압축하지 않는다.
