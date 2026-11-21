@@ -4,14 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "sample = 여성 음성 후보 샘플(mp3)을 voice-samples 릴리스에 올림"
+        description: "sample = 여성 음성 후보 샘플 / all = 전체 4,000개 생성 후 커밋, APK 빌드"
         required: true
         default: sample
         type: choice
-        options: [sample]
+        options: [sample, all]
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   tts:
@@ -41,3 +42,30 @@ jobs:
             dist/samples/*.mp3
             dist/samples/README.txt
           body: "갤럭시에서 mp3를 눌러 들어 보고, 마음에 드는 중국어·한국어 음성 이름을 알려 주세요. 파일 이름: 언어_음성_항목.mp3"
+
+      - name: Generate all audio
+        if: inputs.mode == 'all'
+        env:
+          GOOGLE_TTS_API_KEY: ${{ secrets.GOOGLE_TTS_API_KEY }}
+        run: python3 tools/tts.py all
+
+      - name: Commit audio
+        if: inputs.mode == 'all'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/assets/audio
+          if git diff --cached --quiet; then
+            echo "새로 생성된 음성이 없습니다."
+          else
+            n=$(git diff --cached --name-only | wc -l)
+            git commit -m "음성 파일 ${n}개 생성 (Google TTS, Aoede)"
+            git push
+          fi
+          du -sh app/src/main/assets/audio
+
+      - name: Build APK with audio
+        if: inputs.mode == 'all'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run build-apk.yml --ref main

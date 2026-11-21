@@ -1,10 +1,12 @@
 package com.hwanseong.hskstudy
 
 import android.content.Context
+import android.media.MediaPlayer
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,8 +40,33 @@ private val Ink = Color(0xFF1C1B19)
 private val Secondary = Color(0xFF5E5A54)
 private val Accent = Color(0xFFB8322A)
 
-data class Word(val id: Int, val level: Int, val hanzi: String, val pinyin: String, val meaning: String)
-data class Sentence(val id: String, val wordId: Int, val zh: String, val pinyin: String, val ko: String)
+data class Word(
+    val id: Int, val level: Int, val hanzi: String, val pinyin: String, val meaning: String,
+    val audioZh: String, val audioKo: String,
+)
+data class Sentence(val id: String, val wordId: Int, val zh: String, val pinyin: String, val ko: String, val audio: String)
+
+/** assets의 음성 파일을 재생한다. 새로 재생하면 이전 재생은 멈춘다. 파일이 없으면 조용히 넘어간다. */
+object AudioPlayer {
+    private var player: MediaPlayer? = null
+
+    fun play(context: Context, path: String) {
+        player?.release()
+        player = null
+        val fd = try {
+            context.assets.openFd(path)
+        } catch (e: Exception) {
+            return
+        }
+        player = MediaPlayer().apply {
+            setDataSource(fd.fileDescriptor, fd.startOffset, fd.length)
+            fd.close()
+            setOnCompletionListener { it.release(); if (player === it) player = null }
+            prepare()
+            start()
+        }
+    }
+}
 
 /** 0단계 확인용: assets의 JSON을 읽는다. 1단계에서 Room/Repository 구조로 바꾼다. */
 fun loadWords(context: Context): List<Word> {
@@ -46,7 +74,10 @@ fun loadWords(context: Context): List<Word> {
     val arr = JSONArray(json)
     return List(arr.length()) { i ->
         val o = arr.getJSONObject(i)
-        Word(o.getInt("id"), o.getInt("level"), o.getString("hanzi"), o.getString("pinyin"), o.getString("meaningKo"))
+        Word(
+            o.getInt("id"), o.getInt("level"), o.getString("hanzi"), o.getString("pinyin"), o.getString("meaningKo"),
+            o.getString("audioZh"), o.getString("audioKo"),
+        )
     }
 }
 
@@ -55,7 +86,7 @@ fun loadSentences(context: Context): List<Sentence> {
     val arr = JSONArray(json)
     return List(arr.length()) { i ->
         val o = arr.getJSONObject(i)
-        Sentence(o.getString("id"), o.getInt("wordId"), o.getString("zh"), o.getString("pinyin"), o.getString("ko"))
+        Sentence(o.getString("id"), o.getInt("wordId"), o.getString("zh"), o.getString("pinyin"), o.getString("ko"), o.getString("audio"))
     }
 }
 
@@ -74,6 +105,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun CheckScreen(words: List<Word>, sentences: List<Sentence>) {
+    val context = LocalContext.current
     var index by remember { mutableIntStateOf(0) }
     val word = words[index]
     val examples = sentences.filter { it.wordId == word.id }
@@ -103,15 +135,23 @@ fun CheckScreen(words: List<Word>, sentences: List<Sentence>) {
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text("${word.level}급 · ${word.id}번", fontSize = 12.sp, color = Accent)
-            Text(word.hanzi, fontSize = 72.sp, color = Ink)
+            Text(
+                word.hanzi, fontSize = 72.sp, color = Ink,
+                modifier = Modifier.clickable { AudioPlayer.play(context, word.audioZh) },
+            )
             Text(word.pinyin, fontSize = 20.sp, color = Accent)
-            Text(word.meaning, fontSize = 18.sp, fontWeight = FontWeight.Medium, color = Ink)
+            Text(
+                word.meaning, fontSize = 18.sp, fontWeight = FontWeight.Medium, color = Ink,
+                modifier = Modifier.clickable { AudioPlayer.play(context, word.audioKo) },
+            )
+            Text("한자·뜻·예문을 누르면 음성이 나와요", fontSize = 11.sp, color = Secondary)
             examples.forEachIndexed { n, s ->
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 8.dp)
                         .background(Ground, RoundedCornerShape(14.dp))
+                        .clickable { AudioPlayer.play(context, s.audio) }
                         .padding(12.dp),
                 ) {
                     Text("예문 ${n + 1}", fontSize = 11.sp, color = Secondary)
@@ -123,12 +163,18 @@ fun CheckScreen(words: List<Word>, sentences: List<Sentence>) {
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Button(
-                onClick = { index = (index - 1 + words.size) % words.size },
+                onClick = {
+                    index = (index - 1 + words.size) % words.size
+                    AudioPlayer.play(context, words[index].audioZh)
+                },
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Ink),
                 modifier = Modifier.weight(1f),
             ) { Text("이전") }
             Button(
-                onClick = { index = (index + 1) % words.size },
+                onClick = {
+                    index = (index + 1) % words.size
+                    AudioPlayer.play(context, words[index].audioZh)
+                },
                 colors = ButtonDefaults.buttonColors(containerColor = Accent),
                 modifier = Modifier.weight(1f),
             ) { Text("다음") }
